@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Інтерактивна карта районів України</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Карта буде займати весь екран */
+    #map {
+      width: 100vw;
+      height: 100vh;
+      background-color: #e5e5e5;
+    }
+
+    .info-panel {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="info-panel">
+    <h3>Карта покриття (Рівень 2)</h3>
+    <p>Клікніть на будь-який район,<br>щоб побачити його назву.</p>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // 1. Ініціалізація карти. Координати центру України і початковий зум
+    const map = L.map('map').setView([48.3794, 31.1656], 6);
+
+    // 2. Стиль для наших районів (полігонів)
+    const defaultStyle = {
+      color: "#a0a0a0",     // світлий та тонкий колір внутрішніх меж районів
+      weight: 0.6,          // дуже тоненькі межі районів (ледь виразні)
+      fillColor: "#3388ff", // колір заливки
+      fillOpacity: 0.15     // легка прозорість
+    };
+
+    // Стиль при наведенні мишкою
+    const highlightStyle = {
+      weight: 1.5,
+      color: '#444',
+      fillOpacity: 0.4
+    };
+
+    // 3. Завантаження нашого GeoJSON файлу
+    fetch('ukraine_final_map.geojson')
+      .then(response => response.json())
+      .then(data => {
+        // Додаємо дані на карту
+        L.geoJSON(data, {
+          style: defaultStyle,
+
+          // Ця функція спрацьовує для КОЖНОГО району при малюванні
+          onEachFeature: function (feature, layer) {
+            // Витягуємо українську назву (у нашому файлі це властивість "rayon")
+            const regionName = feature.properties.rayon || feature.properties['name:uk'] || feature.properties.name || "Невідомий район";
+
+            // Додаємо спливаюче вікно при кліку
+            layer.bindPopup(`<b>${regionName}</b><br>Кількість радарів: очікує підключення БД`);
+
+            // Додаємо ефекти при наведенні та кліку
+            layer.on({
+              mouseover: function (e) {
+                const l = e.target;
+                l.setStyle(highlightStyle);
+              },
+              mouseout: function (e) {
+                // Повертаємо базовий стиль
+                layer.setStyle(defaultStyle);
+              },
+              click: function (e) {
+                // Виводимо в консоль
+                console.log("Клік на район:", regionName, feature.properties);
+                
+                // Оновлюємо бічну панель на сторінці
+                const infoParagraph = document.querySelector('.info-panel p');
+                if (infoParagraph) {
+                  infoParagraph.innerHTML = `Вибрано: <b>${regionName}</b><br>Кількість радарів: очікує підключення БД`;
+                }
+              }
+            });
+
+          }
+        }).addTo(map);
+
+        // 4. Завантаження областей поверх районів для жирніших міжобласних кордонів (з точного файлу меж)
+        return fetch('precise_oblast_borders.geojson');
+      })
+
+      .then(response => response.json())
+      .then(data => {
+        L.geoJSON(data, {
+          style: function(feature) {
+            // Розрізняємо державний кордон та межі областей
+            if (feature.properties && feature.properties.border_type === 'state') {
+              return {
+                color: "#1a1a1a",     // виразний темний державний кордон України
+                weight: 2.8,          // товста лінія
+                interactive: false
+              };
+            } else {
+              return {
+                color: "#555555",     // менш виразна межа областей
+                weight: 1.5,          // середня лінія
+                interactive: false
+              };
+            }
+          }
+        }).addTo(map);
+      })
+      .catch(error => console.error('Помилка завантаження карти:', error));
+
+  </script>
+</body>
+
+</html>
