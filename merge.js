@@ -4,79 +4,104 @@ const path = require('path');
 console.log('Починаємо аналіз кордонів у файлі rayony.geojson...');
 
 const rayonyPath = 'rayony_clean.geojson';
-const cleanMapPath = 'ukraine_136_clean.geojson';
+const regionyPath = 'regiony.geojson';
 
 if (!fs.existsSync(rayonyPath)) {
   console.error('❌ Помилка: файл rayony_clean.geojson не знайдено!');
   process.exit(1);
 }
-if (!fs.existsSync(cleanMapPath)) {
-  console.error('❌ Помилка: файл ukraine_136_clean.geojson не знайдено!');
+if (!fs.existsSync(regionyPath)) {
+  console.error('❌ Помилка: файл regiony.geojson не знайдено!');
   process.exit(1);
 }
 
 const rayonyData = JSON.parse(fs.readFileSync(rayonyPath, 'utf8'));
-const cleanMap = JSON.parse(fs.readFileSync(cleanMapPath, 'utf8'));
+const regionsData = JSON.parse(fs.readFileSync(regionyPath, 'utf8'));
 
-// 1. Отримання кодів областей
-const getOblastCode = (props) => {
-  if (props.koatuu) return props.koatuu.slice(0, 2);
-  if (props.katotth && props.katotth.startsWith('UA')) return props.katotth.slice(2, 4);
-  return null;
-};
-
-const cleanRaions = new Map();
-cleanMap.features.forEach(f => {
-  const code = getOblastCode(f.properties);
-  if (!code) return;
-  const names = [
-    f.properties.name,
-    f.properties['name:uk'],
-    f.properties['name:ru'],
-    f.properties['name:en']
-  ].filter(Boolean);
-  names.forEach(name => {
-    const norm = name.toLowerCase().replace(/[’'’`\s-]/g, '');
-    cleanRaions.set(norm, code);
-  });
-});
-
-const manualRaionToOblast = {
-  "володимирволинськийрайон": "07",
-  "новоградволинськийрайон": "18",
-  "новомосковськийрайон": "12",
-  "красноградськийрайон": "63",
-  "червоноградськийрайон": "46",
-  "львівськийрайон": "46",
-  "купянськийрайон": "63"
-};
-
-for (const [k, v] of Object.entries(manualRaionToOblast)) {
-  cleanRaions.set(k, v);
+// 1. Визначення приналежності районів до областей через геометричний аналіз
+function isPointInPolygon(point, polygon) {
+  const [x, y] = point;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect = ((yi > y) !== (yj > y))
+        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
 }
+
+function isPointInMultiPolygon(point, coordinates) {
+  for (const polygon of coordinates) {
+    const outerRing = polygon[0];
+    if (isPointInPolygon(point, outerRing)) {
+      let inHole = false;
+      for (let i = 1; i < polygon.length; i++) {
+        if (isPointInPolygon(point, polygon[i])) {
+          inHole = true;
+          break;
+        }
+      }
+      if (!inHole) return true;
+    }
+  }
+  return false;
+}
+
+function getCentroid(coords, type) {
+  let ring;
+  if (type === 'Polygon') {
+    ring = coords[0];
+  } else if (type === 'MultiPolygon') {
+    ring = coords[0][0];
+  }
+  if (!ring || ring.length === 0) return null;
+  let sumX = 0, sumY = 0;
+  ring.forEach(pt => {
+    sumX += pt[0];
+    sumY += pt[1];
+  });
+  return [sumX / ring.length, sumY / ring.length];
+}
+
+const fallbackOblasts = {
+  "бердянськийрайон": "Запорізька область",
+  "перекопськийрайон": "Автономна Республіка Крим",
+  "ізмаїльськийрайон": "Одеська область",
+  "київ": "Київ"
+};
 
 const featureOblastCodes = rayonyData.features.map((f, index) => {
   const name = f.properties.rayon || f.properties.name || '';
   const normName = name.toLowerCase().replace(/[’'’`\s-]/g, '');
-  let code = cleanRaions.get(normName);
-  
-  if (!code) {
-    if (normName.includes('київ')) {
-      code = '80';
-    } else {
-      for (const [k, v] of cleanRaions.entries()) {
-        if (normName.includes(k) || k.includes(normName)) {
-          code = v;
-          break;
-        }
-      }
+
+  if (fallbackOblasts[normName]) {
+    return fallbackOblasts[normName];
+  }
+  if (normName.includes('київ')) {
+    return 'Київ';
+  }
+
+  const pt = getCentroid(f.geometry.coordinates, f.geometry.type);
+  if (!pt) {
+    return `UNKNOWN_${index}`;
+  }
+
+  let foundRegion = null;
+  for (const reg of regionsData.features) {
+    const regGeom = reg.geometry;
+    const isInside = regGeom.type === 'Polygon' 
+      ? isPointInPolygon(pt, regGeom.coordinates[0])
+      : isPointInMultiPolygon(pt, regGeom.coordinates);
+    
+    if (isInside) {
+      foundRegion = reg.properties.region;
+      break;
     }
   }
-  
-  if (!code) {
-    code = `UNKNOWN_${index}`;
-  }
-  return code;
+
+  return foundRegion || `UNKNOWN_${index}`;
 });
 
 // 2. Спочатку виділяємо контур Києва з оригінальних (не змінених) координат,
@@ -229,7 +254,7 @@ const kyivFeature = {
 
 // Зливаємо Київ у масив фіч
 rayonyData.features.push(kyivFeature);
-featureOblastCodes.push('80');
+featureOblastCodes.push('Київ');
 
 fs.writeFileSync('ukraine_final_map.geojson', JSON.stringify(rayonyData, null, 2));
 console.log('🎉 Файл ukraine_final_map.geojson створено.');
