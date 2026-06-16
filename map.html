@@ -47,21 +47,23 @@
       background: none !important;
       border: none !important;
       box-shadow: none !important;
-      color: #555c66 !important; /* м'який сіро-синій колір літер */
+      color: #555c66 !important;
+      /* м'який сіро-синій колір літер */
       font-family: 'Roboto Condensed', sans-serif;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 1px;
       text-align: center;
       /* Напівпрозоре розмиття навколо літер для читабельності замість жорстких білих обводок */
-      text-shadow: 
-        -1px -1px 0 rgba(255, 255, 255, 0.75),  
-         1px -1px 0 rgba(255, 255, 255, 0.75),
-        -1px  1px 0 rgba(255, 255, 255, 0.75),
-         1px  1px 0 rgba(255, 255, 255, 0.75),
-         0px 0px 3px rgba(255, 255, 255, 0.9);
+      text-shadow:
+        -1px -1px 0 rgba(255, 255, 255, 0.75),
+        1px -1px 0 rgba(255, 255, 255, 0.75),
+        -1px 1px 0 rgba(255, 255, 255, 0.75),
+        1px 1px 0 rgba(255, 255, 255, 0.75),
+        0px 0px 3px rgba(255, 255, 255, 0.9);
       white-space: nowrap;
-      pointer-events: none !important; /* Прозорі для кліків, щоб клікалися райони під ними */
+      pointer-events: none !important;
+      /* Прозорі для кліків, щоб клікалися райони під ними */
     }
 
     :root {
@@ -159,7 +161,7 @@
                 // Виводимо в консоль
                 console.log("Клік на район:", regionName, feature.properties);
                 console.log(`Клік на карті (через район). Координати для копіювання: [${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}]`);
-                
+
                 // Оновлюємо бічну панель на сторінці
                 const infoParagraph = document.querySelector('.info-panel p');
                 if (infoParagraph) {
@@ -178,7 +180,7 @@
       .then(response => response.json())
       .then(data => {
         L.geoJSON(data, {
-          style: function(feature) {
+          style: function (feature) {
             // Розрізняємо державний кордон та межі областей
             if (feature.properties && feature.properties.border_type === 'state') {
               return {
@@ -212,26 +214,27 @@
       { name: "Полтавська", coords: [49.70, 33.90], size: "large" },
       { name: "Херсонська", coords: [46.50, 33.70], size: "large" },
       { name: "Київська", coords: [49.95, 30.55], size: "large" },
-      { name: "Крим", coords: [45.40, 34.20], size: "large" },
+      { name: "АР Крим", coords: [45.40, 34.20], size: "large" },
 
       { name: "Сумська", coords: [50.90, 34.25], size: "medium" },
       { name: "Донецька", coords: [48.05, 37.70], size: "medium" },
       { name: "Запорізька", coords: [47.25, 35.80], size: "medium" },
       { name: "Миколаївська", coords: [47.35, 32.00], size: "medium" },
       { name: "Кіровоградська", coords: [48.45, 32.20], size: "medium" },
-      { name: "Рівненська", coords: [50.65, 26.50], size: "small" },
       { name: "Волинська", coords: [51.05, 24.95], size: "medium" },
       { name: "Львівська", coords: [49.85, 24.05], size: "medium" },
-      { name: "Хмельницька", coords: [49.45, 26.95], size: "small" },
       { name: "Луганська", coords: [49.00, 39.00], size: "medium" },
-      { name: "Вінницька", coords: [49.00, 28.60], size: "medium" },
-      { name: "Черкаська", coords: [49.40, 31.40], size: "medium" },
+      { name: "Вінницька", coords: [48.90, 28.75], size: "medium" },
+      { name: "Черкаська", coords: [49.15, 31.40], size: "medium" },
 
-      { name: "Тернопільська", coords: [49.55, 25.60], size: "small" },
-      { name: "Івано-Франківська", coords: [48.75, 24.40], size: "small" },
-      { name: "Закарпатська", coords: [48.40, 23.25], size: "small" },
-      { name: "Чернівецька", coords: [48.22, 26.20], size: "small" },
-      { name: "Київ", coords: [50.4501, 30.5234], size: "small" }
+      { name: "Хмельницька", coords: [49.45, 26.95], size: "small" },
+      { name: "Рівненська", coords: [50.65, 26.50], size: "small" },
+      { name: "Тернопільська", coords: [49.425, 25.48], size: "small" },
+      { name: "Івано-Франківська", coords: [48.68, 24.58], size: "small" },
+      { name: "Закарпатська", coords: [48.33, 23.25], size: "small" },
+      { name: "Чернівецька", coords: [48.12, 25.750], size: "small" },
+      { name: "Київ", coords: [50.401, 30.5234], size: "small" },
+      { name: "Севастополь", coords: [44.55000, 33.642], size: "small" }
     ];
 
     const oblastLabelsGroup = L.layerGroup().addTo(map);
@@ -246,7 +249,7 @@
           iconAnchor: [60, 10]
         });
 
-        L.marker(item.coords, { 
+        L.marker(item.coords, {
           icon: labelIcon,
           interactive: false // назва пропускає кліки крізь себе
         }).addTo(oblastLabelsGroup);
@@ -271,12 +274,12 @@
 
     // Слухаємо зміну зуму карти
     map.on('zoomend', updateLabelsVisibilityAndScale);
-    
+
     // Викликаємо один раз при запуску
     updateLabelsVisibilityAndScale();
 
     // Допоміжний інструмент для розробника: клік у будь-якому місці карти виводить точні координати в консоль браузера (F12)
-    map.on('click', function(e) {
+    map.on('click', function (e) {
       console.log(`Клік на карті. Координати для копіювання: [${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}]`);
     });
 
